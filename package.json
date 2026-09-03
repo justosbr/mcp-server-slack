@@ -1,0 +1,26 @@
+{
+  "name": "mcp-server-slack",
+  "version": "0.1.0",
+  "description": "Read-only MCP server for public Slack channels — list, join, history, threads, users",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "mcp-server-slack": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.0"
+  }
+}
