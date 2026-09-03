@@ -3,6 +3,7 @@ import { slackCall } from "../slack.js";
 import { ToolDefinition, CHANNEL_SCHEMA, CURSOR_SCHEMA } from "./types.js";
 import { formatError, errorContent } from "../utils/errors.js";
 import { formatMessages, SlackMessage } from "../utils/format.js";
+import type { SlackEnv } from "../config.js";
 
 const schema = {
   channel: CHANNEL_SCHEMA,
@@ -11,7 +12,7 @@ const schema = {
   cursor: CURSOR_SCHEMA,
 };
 
-async function handler(params: Record<string, unknown>, env: { botToken: string }) {
+async function handler(params: Record<string, unknown>, env: SlackEnv) {
   const channel = params.channel as string;
   const ts = params.thread_ts as string;
   const limit = (params.limit as number) ?? 50;

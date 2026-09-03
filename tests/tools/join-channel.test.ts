@@ -32,6 +32,6 @@ describe("join_channel", () => {
       .mockResolvedValueOnce({ ok: true, warning: "already_in_channel", channel: { id: "C1", name: "eng" } });
     const out = await joinChannel.handler({ channel: "C1" }, env);
     expect(out.isError).toBeUndefined();
-    expect(out.content[0].text).toContain("already a member");
+    expect(out.content[0].text).toContain("Already a member");
   });
 });

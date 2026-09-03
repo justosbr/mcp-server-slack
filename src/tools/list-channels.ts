@@ -3,9 +3,10 @@ import { slackCall } from "../slack.js";
 import { ToolDefinition, CURSOR_SCHEMA } from "./types.js";
 import { formatError, errorContent } from "../utils/errors.js";
 import { clip } from "../utils/format.js";
+import type { SlackEnv } from "../config.js";
 
 const schema = {
-  query: z.string().optional().describe("Case-insensitive substring matched against channel name, topic, and purpose"),
+  query: z.string().max(200).optional().describe("Case-insensitive substring matched against channel name, topic, and purpose"),
   limit: z.number().int().min(1).max(200).default(100).describe("Channels per page (1-200). Default 100"),
   cursor: CURSOR_SCHEMA,
 };
@@ -15,7 +16,7 @@ interface Channel {
   topic?: { value?: string }; purpose?: { value?: string };
 }
 
-async function handler(params: Record<string, unknown>, env: { botToken: string }) {
+async function handler(params: Record<string, unknown>, env: SlackEnv) {
   const query = (params.query as string | undefined)?.toLowerCase();
   const limit = (params.limit as number) ?? 100;
   const cursor = params.cursor as string | undefined;

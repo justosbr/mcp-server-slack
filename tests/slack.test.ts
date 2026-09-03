@@ -43,4 +43,11 @@ describe("slackCall", () => {
     fetchMock.mockResolvedValue(new Response("", { status: 429, headers: { "Retry-After": "7" } }));
     await expect(slackCall(env, "conversations.list", {})).rejects.toMatchObject({ code: "ratelimited", status: 429, retryAfterSeconds: 7 });
   });
+
+  it("omits retryAfterSeconds when the Retry-After header is missing", async () => {
+    fetchMock.mockResolvedValue(new Response("", { status: 429 }));
+    await expect(slackCall(env, "conversations.list", {})).rejects.toMatchObject({
+      code: "ratelimited", status: 429, retryAfterSeconds: undefined,
+    });
+  });
 });

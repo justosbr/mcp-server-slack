@@ -3,6 +3,7 @@ import { slackCall } from "../slack.js";
 import { ToolDefinition, CHANNEL_SCHEMA, CURSOR_SCHEMA } from "./types.js";
 import { formatError, errorContent } from "../utils/errors.js";
 import { formatMessages, SlackMessage } from "../utils/format.js";
+import type { SlackEnv } from "../config.js";
 
 /** Slack takes Unix seconds; accept ISO-8601 too and convert. */
 export function toUnixSeconds(value: string | undefined): string | undefined {
@@ -21,7 +22,7 @@ const schema = {
   cursor: CURSOR_SCHEMA,
 };
 
-async function handler(params: Record<string, unknown>, env: { botToken: string }) {
+async function handler(params: Record<string, unknown>, env: SlackEnv) {
   const channel = params.channel as string;
   const limit = (params.limit as number) ?? 50;
   try {

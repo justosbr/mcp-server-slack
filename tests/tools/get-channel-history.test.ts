@@ -3,6 +3,7 @@ const { mockSlackCall } = vi.hoisted(() => ({ mockSlackCall: vi.fn() }));
 vi.mock("../../src/slack.js", async (importOriginal) => ({ ...(await importOriginal<typeof import("../../src/slack.js")>()), slackCall: mockSlackCall }));
 import { getChannelHistory } from "../../src/tools/get-channel-history.js";
 import { SlackApiError } from "../../src/slack.js";
+import { boundToolResult, MAX_OUTPUT_BYTES } from "../../src/utils/format.js";
 const env = { botToken: "xoxb-test" };
 
 // Reset is called at the top of each test rather than in beforeEach: see the note in
@@ -29,5 +30,24 @@ describe("get_channel_history", () => {
     const out = await getChannelHistory.handler({ channel: "C1" }, env);
     expect(out.isError).toBe(true);
     expect(out.content[0].text).toContain("join_channel");
+  });
+
+  it("bounds a complete result to MAX_OUTPUT_BYTES even with many messages plus a header and cursor line", async () => {
+    mockSlackCall.mockReset();
+    // Short lines so formatMessages' own per-list cap leaves at most one line's worth of
+    // headroom (a few dozen bytes) — comfortably less than the header + cursor line this
+    // tool adds afterward, so the combined result reliably exceeds MAX_OUTPUT_BYTES and
+    // boundToolResult has to truncate it.
+    const messages = Array.from({ length: 500 }, (_, i) => ({
+      ts: `${1725283200 + i}.000000`,
+      user: "U1",
+      text: "short message body",
+    }));
+    mockSlackCall.mockResolvedValue({ ok: true, messages, has_more: true, response_metadata: { next_cursor: "cur" } });
+    const raw = await getChannelHistory.handler({ channel: "C1" }, env);
+    expect(Buffer.byteLength(raw.content[0].text, "utf8")).toBeGreaterThan(MAX_OUTPUT_BYTES);
+    const bounded = boundToolResult(raw).content[0].text;
+    expect(Buffer.byteLength(bounded, "utf8")).toBeLessThanOrEqual(MAX_OUTPUT_BYTES);
+    expect(bounded.endsWith("[truncated]")).toBe(true);
   });
 });

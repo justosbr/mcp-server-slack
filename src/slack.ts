@@ -40,8 +40,10 @@ export async function slackCall<T = any>(
   }
   const response = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   if (response.status === 429) {
-    const ra = Number(response.headers.get("Retry-After") ?? "");
-    throw new SlackApiError(method, "ratelimited", 429, Number.isFinite(ra) ? ra : undefined);
+    const header = response.headers.get("Retry-After");
+    const parsed = header !== null ? Number(header) : NaN;
+    const retryAfterSeconds = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+    throw new SlackApiError(method, "ratelimited", 429, retryAfterSeconds);
   }
   if (!response.ok) {
     throw new SlackApiError(method, `http_${response.status}`, response.status);

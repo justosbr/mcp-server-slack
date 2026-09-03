@@ -2,12 +2,13 @@ import { z } from "zod";
 import { slackCall } from "../slack.js";
 import { ToolDefinition } from "./types.js";
 import { formatError, errorContent } from "../utils/errors.js";
+import type { SlackEnv } from "../config.js";
 
 const schema = { user: z.string().regex(/^[UW][A-Z0-9]+$/, "a Slack user id like U0123ABCD").describe("User id (U…) as it appears in messages") };
 
 interface SlackUser { id: string; name?: string; real_name?: string; tz?: string; is_bot?: boolean; deleted?: boolean; profile?: { display_name?: string; title?: string } }
 
-async function handler(params: Record<string, unknown>, env: { botToken: string }) {
+async function handler(params: Record<string, unknown>, env: SlackEnv) {
   const user = params.user as string;
   try {
     const res = await slackCall<{ user: SlackUser }>(env, "users.info", { user });

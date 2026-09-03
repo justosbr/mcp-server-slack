@@ -1,12 +1,13 @@
 import { slackCall } from "../slack.js";
 import { ToolDefinition, CHANNEL_SCHEMA } from "./types.js";
 import { formatError, errorContent } from "../utils/errors.js";
+import type { SlackEnv } from "../config.js";
 
 const schema = { channel: CHANNEL_SCHEMA };
 
 interface ChannelInfo { id: string; name: string; is_channel?: boolean; is_private?: boolean; is_archived?: boolean }
 
-async function handler(params: Record<string, unknown>, env: { botToken: string }) {
+async function handler(params: Record<string, unknown>, env: SlackEnv) {
   const channel = params.channel as string;
   try {
     const info = await slackCall<{ channel: ChannelInfo }>(env, "conversations.info", { channel });
@@ -19,7 +20,7 @@ async function handler(params: Record<string, unknown>, env: { botToken: string 
     }
     const joined = await slackCall<{ warning?: string; channel: ChannelInfo }>(env, "conversations.join", { channel }, { post: true });
     const already = joined.warning?.includes("already_in_channel");
-    return { content: [{ type: "text" as const, text: already ? `already a member of #${c.name} (${channel}).` : `Joined #${c.name} (${channel}). Its history is now readable.` }] };
+    return { content: [{ type: "text" as const, text: already ? `Already a member of #${c.name} (${channel}).` : `Joined #${c.name} (${channel}). Its history is now readable.` }] };
   } catch (error) {
     return errorContent(formatError(error, "join_channel"));
   }
