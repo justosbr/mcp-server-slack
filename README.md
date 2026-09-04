@@ -36,7 +36,7 @@ npm run build
 
 | Tool | Slack method | Notes |
 |---|---|---|
-| `list_channels` | `conversations.list` (`types=public_channel`) | id, members, whether the bot is a member, topic/purpose; substring filter; paginated |
+| `list_channels` | `conversations.list` (`types=public_channel`) | id, members, whether the bot is a member, topic/purpose; a `query` substring searches the whole workspace in one call (up to 2000 channels, then a cursor to continue) and the reply states how much was searched; without a query, paginated a page at a time |
 | `join_channel` | `conversations.info` + `conversations.join` | the one write: joins a public channel so its history is readable; refuses private/archived |
 | `get_channel_history` | `conversations.history` | oldest-first, time window (ISO or Unix), paginated; `not_in_channel` → join hint |
 | `get_thread` | `conversations.replies` | parent + replies for a `ts` |

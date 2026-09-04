@@ -49,6 +49,27 @@ describe("list_channels", () => {
     expect(text).not.toContain("C3");
   });
 
+  it("walks pages for a query whose only match is on a later page", async () => {
+    mockSlackCall.mockReset();
+    mockSlackCall
+      .mockResolvedValueOnce({ ok: true, channels: [{ id: "C1", name: "random", topic: { value: "" }, purpose: { value: "" }, num_members: 3, is_member: false }], response_metadata: { next_cursor: "page2" } })
+      .mockResolvedValueOnce({ ok: true, channels: [{ id: "C2", name: "automations", topic: { value: "" }, purpose: { value: "" }, num_members: 9, is_member: false }] });
+    const text = (await listChannels.handler({ query: "automations" }, env)).content[0].text;
+    expect(mockSlackCall).toHaveBeenCalledTimes(2);
+    expect(mockSlackCall).toHaveBeenNthCalledWith(2, env, "conversations.list", expect.objectContaining({ limit: 200, cursor: "page2" }));
+    expect(text).toContain("#automations (C2)");
+  });
+
+  it("reports the whole workspace as searched when a query matches nothing", async () => {
+    mockSlackCall.mockReset();
+    mockSlackCall
+      .mockResolvedValueOnce({ ok: true, channels: [{ id: "C1", name: "random", topic: { value: "" }, purpose: { value: "" }, num_members: 3, is_member: false }], response_metadata: { next_cursor: "page2" } })
+      .mockResolvedValueOnce({ ok: true, channels: [{ id: "C2", name: "design", topic: { value: "" }, purpose: { value: "" }, num_members: 4, is_member: false }] });
+    const text = (await listChannels.handler({ query: "automations" }, env)).content[0].text;
+    expect(text).toContain("searched all 2 public channels");
+    expect(text).not.toContain("on this page");
+  });
+
   it("returns an error result on Slack failure", async () => {
     mockSlackCall.mockReset();
     const { SlackApiError } = await import("../../src/slack.js");
