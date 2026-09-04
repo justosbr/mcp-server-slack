@@ -14,7 +14,7 @@ const MAX_SEARCH_PAGES = 10;
 
 const schema = {
   query: z.string().max(200).optional().describe("Case-insensitive substring matched against channel name, topic, and purpose. Searches the whole workspace, not one page"),
-  limit: z.number().int().min(1).max(200).default(100).describe("Channels per page (1-200), and the maximum number of matches rendered for a query. Default 100"),
+  limit: z.number().int().min(1).max(200).default(100).describe("Channels per page (1-200) when listing without a query. Default 100. A query is searched at Slack's maximum page size regardless"),
   cursor: CURSOR_SCHEMA,
 };
 
@@ -29,10 +29,12 @@ interface ChannelPage {
 }
 
 interface Scan {
+  /** Every match on the pages walked. The rendered list and the ground the cursor resumes
+   *  after cover the same pages, so a continuation cannot step over a match. */
   matches: Channel[];
   scanned: number;
   /** Set only when the page cap stopped the walk with pages still unread, so the caller can
-   *  resume from here; absent means every public channel was seen. */
+   *  resume from here; absent means the walk reached the end of the list. */
   nextCursor?: string;
 }
 
@@ -77,21 +79,28 @@ function count(n: number): string {
   return `${n} public channel${n === 1 ? "" : "s"}`;
 }
 
-function searchText(query: string, limit: number, result: Scan): string {
-  const coverage = result.nextCursor
+/** States what the walk covered. `scanned` counts only the channels after the start cursor, so
+ *  a resumed walk is described relative to that cursor: "all" and "the first" are claims only a
+ *  walk from the start of the list can make. */
+function coverageText(result: Scan, resumed: boolean): string {
+  if (resumed) {
+    return result.nextCursor
+      ? `searched ${count(result.scanned)} from the supplied cursor (search cap reached)`
+      : `searched ${count(result.scanned)} from the supplied cursor to the end of the list`;
+  }
+  return result.nextCursor
     ? `searched the first ${count(result.scanned)} (search cap reached)`
     : `searched all ${count(result.scanned)}`;
+}
+
+function searchText(query: string, result: Scan, resumed: boolean): string {
+  const coverage = coverageText(result, resumed);
   if (result.matches.length === 0) {
     const resume = result.nextCursor ? ` Continue the search with cursor: ${result.nextCursor}` : "";
     return `No public channels matching "${query}" — ${coverage}.${resume}`;
   }
-  const shown = result.matches.slice(0, limit);
-  const elided = result.matches.length - shown.length;
-  const header = `${count(result.matches.length)} matching "${query}"`
-    + (elided > 0 ? ` (showing ${shown.length}, narrow the query for the rest)` : "")
-    + ` — ${coverage}:`;
   const resume = result.nextCursor ? `\n\nNext page cursor: ${result.nextCursor}` : "";
-  return `${header}\n\n${render(shown)}${resume}`;
+  return `${count(result.matches.length)} matching "${query}" — ${coverage}:\n\n${render(result.matches)}${resume}`;
 }
 
 async function handler(params: Record<string, unknown>, env: SlackEnv) {
@@ -100,7 +109,8 @@ async function handler(params: Record<string, unknown>, env: SlackEnv) {
   const cursor = params.cursor as string | undefined;
   try {
     if (query) {
-      return { content: [{ type: "text" as const, text: searchText(query, limit, await scan(env, query.toLowerCase(), cursor)) }] };
+      const result = await scan(env, query.toLowerCase(), cursor);
+      return { content: [{ type: "text" as const, text: searchText(query, result, Boolean(cursor)) }] };
     }
     const page = await listPage(env, limit, cursor);
     const channels = page.channels ?? [];
@@ -119,7 +129,7 @@ async function handler(params: Record<string, unknown>, env: SlackEnv) {
 export const listChannels: ToolDefinition = {
   name: "list_channels",
   description:
-    "List public Slack channels (never private channels or DMs) with id, member count, whether the bot is a member, topic and purpose. Pass query to find a channel by name, topic, or purpose: one call searches the whole workspace (up to 2000 channels), so there is no need to page through the list looking for a name. Without a query the list comes back one page at a time. Use the id with the other tools; if member is 'no', call join_channel before reading history.",
+    "List public Slack channels (never private channels or DMs) with id, member count, whether the bot is a member, topic and purpose. Pass query to find a channel by name, topic, or purpose: one call searches the whole workspace (up to 2000 channels) and returns every match it finds, so there is no need to page through the list looking for a name. Without a query the list comes back one page of `limit` channels at a time. Use the id with the other tools; if member is 'no', call join_channel before reading history.",
   schema,
   handler,
 };
