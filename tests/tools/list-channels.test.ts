@@ -49,6 +49,49 @@ describe("list_channels", () => {
     expect(text).not.toContain("C3");
   });
 
+  it("walks pages for a query whose only match is on a later page", async () => {
+    mockSlackCall.mockReset();
+    mockSlackCall
+      .mockResolvedValueOnce({ ok: true, channels: [{ id: "C1", name: "random", topic: { value: "" }, purpose: { value: "" }, num_members: 3, is_member: false }], response_metadata: { next_cursor: "page2" } })
+      .mockResolvedValueOnce({ ok: true, channels: [{ id: "C2", name: "automations", topic: { value: "" }, purpose: { value: "" }, num_members: 9, is_member: false }] });
+    const text = (await listChannels.handler({ query: "automations" }, env)).content[0].text;
+    expect(mockSlackCall).toHaveBeenCalledTimes(2);
+    expect(mockSlackCall).toHaveBeenNthCalledWith(2, env, "conversations.list", expect.objectContaining({ limit: 200, cursor: "page2" }));
+    expect(text).toContain("#automations (C2)");
+  });
+
+  it("reports the whole workspace as searched when a query matches nothing", async () => {
+    mockSlackCall.mockReset();
+    mockSlackCall
+      .mockResolvedValueOnce({ ok: true, channels: [{ id: "C1", name: "random", topic: { value: "" }, purpose: { value: "" }, num_members: 3, is_member: false }], response_metadata: { next_cursor: "page2" } })
+      .mockResolvedValueOnce({ ok: true, channels: [{ id: "C2", name: "design", topic: { value: "" }, purpose: { value: "" }, num_members: 4, is_member: false }] });
+    const text = (await listChannels.handler({ query: "automations" }, env)).content[0].text;
+    expect(text).toContain("searched all 2 public channels");
+    expect(text).not.toContain("on this page");
+  });
+
+  it("renders every match on the scanned pages, past the per-page limit", async () => {
+    mockSlackCall.mockReset();
+    const channels = Array.from({ length: 120 }, (_, i) => ({
+      id: `C${1000 + i}`, name: `ops-${i}`, topic: { value: "" }, purpose: { value: "" }, num_members: 1, is_member: false,
+    }));
+    mockSlackCall.mockResolvedValue({ ok: true, channels });
+    const text = (await listChannels.handler({ query: "ops-", limit: 100 }, env)).content[0].text;
+    expect(text).toContain("120 public channels matching");
+    expect(text).toContain("#ops-119 (C1119)");
+  });
+
+  it("reports coverage relative to a supplied cursor rather than claiming the whole list", async () => {
+    mockSlackCall.mockReset();
+    mockSlackCall.mockResolvedValue({ ok: true, channels: [
+      { id: "C1", name: "automations", topic: { value: "" }, purpose: { value: "" }, num_members: 9, is_member: false },
+    ] });
+    const text = (await listChannels.handler({ query: "automations", cursor: "page4" }, env)).content[0].text;
+    expect(mockSlackCall).toHaveBeenCalledWith(env, "conversations.list", expect.objectContaining({ cursor: "page4" }));
+    expect(text).toContain("from the supplied cursor to the end of the list");
+    expect(text).not.toContain("searched all");
+  });
+
   it("returns an error result on Slack failure", async () => {
     mockSlackCall.mockReset();
     const { SlackApiError } = await import("../../src/slack.js");
